@@ -1,17 +1,30 @@
-#!/usr/bin/env python3
 import os
+import requests
 from dotenv import load_dotenv
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+from telegram.ext import Updater
 
-import re
-import time
-import hashlib
-import sqlite3
-from datetime import datetime, timedelta
-from telegram import Bot
-from dotenv import load_dotenv
-from playwright.sync_api import sync_playwright
-import html as html_lib
+load_dotenv()
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+# Inicijalizacija bota (novi način)
+updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
+bot = updater.bot
+
+
+def send_telegram_message(text):
+    """Šalje poruku na Telegram grupu/kanal"""
+    try:
+        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=text)
+        print("Poruka poslata:", text)
+    except Exception as e:
+        print("Greška pri slanju poruke:", e)
+
+
+# ostatak tvog koda ide ispod
+# npr. glavni loop, scraping logika itd.
+
 
 # --- Učitaj .env ---
 load_dotenv()
