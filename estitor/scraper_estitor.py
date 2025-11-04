@@ -1,8 +1,13 @@
 import os
-import requests
-from dotenv import load_dotenv
+import re
+import time
+import hashlib
+import sqlite3  # ✅ dodaj ovu liniju
+from datetime import datetime, timedelta
 from telegram import Bot
-
+from dotenv import load_dotenv
+from playwright.sync_api import sync_playwright
+import html as html_lib
 
 load_dotenv()
 
