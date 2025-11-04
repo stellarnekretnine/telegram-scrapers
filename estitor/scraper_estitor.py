@@ -1,16 +1,11 @@
 import os
 import requests
 from dotenv import load_dotenv
-from telegram.ext import Updater
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-# Inicijalizacija bota (novi način)
-updater = Updater(token=TELEGRAM_TOKEN, use_context=True)
-bot = updater.bot
 
 
 def send_telegram_message(text):
