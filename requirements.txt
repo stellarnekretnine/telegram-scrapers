@@ -1,6 +1,6 @@
 playwright
 python-dotenv
 requests
-telegram
+python-telegram-bot==13.15
 flask
 
