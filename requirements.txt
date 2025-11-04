@@ -6,4 +6,3 @@ urllib3==1.26.16
 six==1.16.0
 standard-imghdr
 flask
-imgkit
