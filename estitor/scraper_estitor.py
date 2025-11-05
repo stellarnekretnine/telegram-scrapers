@@ -216,9 +216,6 @@ def scrape_with_playwright():
                         skipped_agencies += 1
                         continue
 
-                        skipped_agencies += 1
-                        continue
-
                     # 🆕 Nova provjera – preskoči agencije i oglase bez imena
                     if is_agency(o["seller"]):
                         print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
@@ -253,5 +250,6 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
