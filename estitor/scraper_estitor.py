@@ -3,17 +3,18 @@ import re
 import time
 import hashlib
 import sqlite3
-from datetime import datetime, timedelta
+import unicodedata
+from datetime import datetime
 from telegram import Bot
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 import subprocess
 import html as html_lib
+import requests
 
-# Instalacija Chromium-a (samo ako nije već instaliran)
+# Instalacija Chromium-a (bez greške ako je već instaliran)
 subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=False)
 
-# --- Učitaj .env ---
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -32,7 +33,7 @@ CRNA_LISTA = [
     "milica mitrović",
     "dream homes montenegro",
     "luxury property",
-    "marija  panoska",
+    "marija panoska",
     "roma nekretnine",
     "kvadrat nekretnine",
     "valentina stanišić",
@@ -78,6 +79,26 @@ CRNA_LISTA = [
 ]
 print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste (direktno iz koda).")
 
+# --- Normalizacija imena ---
+def normalize_name(name):
+    """Normalizuje ime (uklanja čćžšđ, velika slova, duple razmake)."""
+    if not name:
+        return ""
+    name = name.strip().lower()
+    name = " ".join(name.split())
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(ch for ch in name if unicodedata.category(ch) != "Mn")
+    name = (
+        name.replace("đ", "dj")
+            .replace("dž", "dz")
+            .replace("č", "c")
+            .replace("ć", "c")
+            .replace("š", "s")
+            .replace("ž", "z")
+    )
+    return name
+
+CRNA_LISTA = [normalize_name(x) for x in CRNA_LISTA]
 
 # --- Setup ---
 DB_PATH = "estitor.db"
@@ -101,26 +122,21 @@ conn.commit()
 def make_id(url):
     return hashlib.sha1(url.encode("utf-8")).hexdigest()
 
-# --- Prepoznavanje agencija ---
 def is_agency(seller):
     name = (seller or "").strip().lower()
     if not name:
-        return True  # prazno ime = vjerovatno agencija
-
+        return True
     bad_words = [
         "nekretnine", "real estate", "properties", "consulting",
         "invest", "home", "group", "estate", "realty", "luxury", "trust"
     ]
     return any(word in name for word in bad_words)
 
-# --- Čuvanje i slanje oglasa ---
 def store_and_notify(item):
-    import requests
-
     uid = make_id(item["url"])
     c.execute("SELECT 1 FROM listings WHERE id=?", (uid,))
     if c.fetchone():
-        return False  # već postoji
+        return False
 
     caption = (
         f"🏠 <b>{item['title']}</b>\n"
@@ -128,8 +144,7 @@ def store_and_notify(item):
         f"📍 {item['location']}\n"
         f"👤 {item['seller']}\n\n"
         f"<a href='{item['url']}'>🔗 Pogledaj oglas</a>"
-    )
-    caption = caption[:1000]
+    )[:1000]
 
     c.execute("""INSERT INTO listings (id, title, price, location, url, img_url, seller, first_seen)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -139,89 +154,58 @@ def store_and_notify(item):
     conn.commit()
 
     try:
-        api_url = ""
-        payload = {}
-
         if item["img_url"]:
             api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-            payload = {
-                "chat_id": TG_CHAT_ID,
-                "photo": item["img_url"],
-                "caption": caption,
-                "parse_mode": "HTML"
-            }
+            payload = {"chat_id": TG_CHAT_ID, "photo": item["img_url"], "caption": caption, "parse_mode": "HTML"}
         else:
             api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-            payload = {
-                "chat_id": TG_CHAT_ID,
-                "text": caption,
-                "parse_mode": "HTML"
-            }
-
+            payload = {"chat_id": TG_CHAT_ID, "text": caption, "parse_mode": "HTML"}
         response = requests.post(api_url, data=payload)
         if response.status_code == 200:
             print(f"📤 Poslato: {item['title']}")
         else:
-            print(f"⚠️ Telegram greška: {response.text}")
-        
+            print(f"⚠️ Telegram error: {response.text}")
         time.sleep(1)
     except Exception as e:
         print("⚠️ Greška pri slanju poruke:", e)
-
     return True
 
-# --- Parser ---
 def parse_offers(html):
     offers = []
     raw_blocks = re.findall(r'\{"@type":"Offer".*?\}\}', html, re.DOTALL)
     for block in raw_blocks:
         try:
             block = html_lib.unescape(block)
-            title_match = re.search(r'"name":"(.*?)"', block)
-            price_match = re.search(r'"price":"(\d+)"', block)
-            url_match = re.search(r'"url":"(https:[^"]+)"', block)
-            loc_match = re.search(r'"addressLocality":"(.*?)"', block)
-            img_match = re.search(r'"image":\{"@type":"ImageObject","url":"(https:[^"]+)"', block)
-            seller_match = re.search(r'"seller".*?"name":"(.*?)"', block)
-            time_match = re.search(r'"datePublished":"(.*?)"', block)
-
-            title = title_match.group(1) if title_match else "Nekretnina"
-            price = f"{price_match.group(1)} €" if price_match else "Po dogovoru"
-            url = url_match.group(1).replace("\\/", "/") if url_match else ""
-            location = loc_match.group(1) if loc_match else "Podgorica"
-            img_url = img_match.group(1).replace("\\/", "/") if img_match else ""
-            seller = seller_match.group(1) if seller_match else ""
-            published = time_match.group(1) if time_match else ""
-
+            title = re.search(r'"name":"(.*?)"', block)
+            price = re.search(r'"price":"(\d+)"', block)
+            url = re.search(r'"url":"(https:[^"]+)"', block)
+            loc = re.search(r'"addressLocality":"(.*?)"', block)
+            img = re.search(r'"image":\{"@type":"ImageObject","url":"(https:[^"]+)"', block)
+            seller = re.search(r'"seller".*?"name":"(.*?)"', block)
             offers.append({
-                "title": title,
-                "price": price,
-                "location": location,
-                "url": url,
-                "img_url": img_url,
-                "seller": seller,
-                "published": published
+                "title": title.group(1) if title else "Nekretnina",
+                "price": f"{price.group(1)} €" if price else "Po dogovoru",
+                "location": loc.group(1) if loc else "Podgorica",
+                "url": url.group(1).replace("\\/", "/") if url else "",
+                "img_url": img.group(1).replace("\\/", "/") if img else "",
+                "seller": seller.group(1) if seller else "",
             })
         except Exception:
             continue
     return offers
 
-# --- Main scraping ---
 def scrape_with_playwright():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         total_new = 0
-
         for pg in range(1, MAX_PAGES + 1):
             url = TARGET_URL if pg == 1 else TARGET_URL.replace("/grad-podgorica", f"/grad-podgorica/strana-{pg}")
             print(f"📄 Stranica {pg}: {url}")
-
             try:
                 page.goto(url, timeout=90000)
                 page.wait_for_load_state("networkidle")
                 time.sleep(5)
-
                 for _ in range(10):
                     page.mouse.wheel(0, 2500)
                     time.sleep(2)
@@ -234,59 +218,32 @@ def scrape_with_playwright():
                 sent_this_page = 0
 
                 for o in offers:
-                    seller_name = (o.get("seller") or "").strip().lower()
-
-                    # Normalizacija karaktera
-                    for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
-                        seller_name = seller_name.replace(src, dst)
-
-                    crna_lista_normalized = []
-                    for bad in CRNA_LISTA:
-                        bad_norm = bad.strip().lower()
-                        for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
-                            bad_norm = bad_norm.replace(src, dst)
-                        crna_lista_normalized.append(bad_norm)
-
+                    seller_clean = normalize_name(o.get("seller"))
                     # Provjera crne liste
-                    if any(bad in seller_name for bad in crna_lista_normalized):
+                    if any(bad in seller_clean for bad in CRNA_LISTA):
                         print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
                         skipped_agencies += 1
                         continue
-
-                    # Preskoči ako je agencija
+                    # Preskoči agencije
                     if is_agency(o["seller"]):
                         print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
                         skipped_agencies += 1
                         continue
-
-                    # Ako je sve OK — pošalji oglas
-                    item = {
-                        "title": o["title"],
-                        "price": o["price"],
-                        "location": o["location"],
-                        "url": o["url"],
-                        "img_url": o["img_url"],
-                        "seller": o["seller"]
-                    }
-
-                    if store_and_notify(item):
+                    # Ako je OK, pošalji
+                    if store_and_notify(o):
                         total_new += 1
                         sent_this_page += 1
 
                 print(f"✅ Stranica {pg}: {len(offers)} pronađeno, {sent_this_page} poslato, {skipped_agencies} preskočeno.")
-
             except Exception as e:
                 print(f"⚠️ Greška na strani {pg}: {e}")
 
         browser.close()
         print(f"📊 Ukupno novih oglasa: {total_new}")
 
-# --- Glavna petlja ---
 if __name__ == "__main__":
     while True:
         print("🔎 Pokrećem provjeru Estitor oglasa...")
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
-
-
