@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-set -o errexit
+# Render build script for Playwright and dependencies
 
-echo "📦 Installing dependencies..."
-pip install --upgrade pip
-pip install python-telegram-bot==13.15
+echo "Installing Python packages..."
 pip install -r requirements.txt
 
-echo "🎭 Installing Playwright browsers..."
-python -m playwright install chromium --with-deps
+echo "Installing Playwright browsers..."
+python -m playwright install --with-deps chromium
 
-echo "✅ Build complete."
+echo "Build completed successfully!"
