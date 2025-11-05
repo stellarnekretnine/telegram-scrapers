@@ -2,36 +2,20 @@ import os
 import re
 import time
 import hashlib
-import sqlite3  # ✅ dodaj ovu liniju
+import sqlite3
 from datetime import datetime, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 import subprocess
-subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=False)
 import html as html_lib
 
-load_dotenv()
-
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
-
-def send_telegram_message(text):
-    """Šalje poruku na Telegram grupu/kanal"""
-    try:
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=text)
-        print("Poruka poslata:", text)
-    except Exception as e:
-        print("Greška pri slanju poruke:", e)
-
-
-# ostatak tvog koda ide ispod
-# npr. glavni loop, scraping logika itd.
-
+# Instalacija Chromium-a (samo ako nije već instaliran)
+subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=False)
 
 # --- Učitaj .env ---
 load_dotenv()
+
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 TARGET_URL = os.getenv("TARGET_URL")
@@ -39,16 +23,11 @@ CRAWL_INTERVAL_MINUTES = int(os.getenv("CRAWL_INTERVAL_MINUTES", 45))
 MAX_PAGES = int(os.getenv("MAX_PAGES", 5))
 
 # --- Block lista ---
-# --- Block lista ---
-# --- Block lista ---
-import os
-import time
-
 try:
-    # Sačekaj da Render mountuje fajl (nekad kasni sekund-dva)
     crna_lista_path = os.getenv("CRNA_LISTA_FILE", "/etc/secrets/crna_lista.txt")
 
-    for _ in range(5):  # pokušaj do 5 puta
+    # Sačekaj da Render mountuje fajl (nekad kasni sekund-dva)
+    for _ in range(5):
         if os.path.exists(crna_lista_path):
             break
         print("⌛ Čekam da Render učita crna_lista.txt...")
@@ -62,6 +41,9 @@ try:
         print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
         CRNA_LISTA = []
 
+except Exception as e:
+    print(f"⚠️ Greška prilikom učitavanja crne liste: {e}")
+    CRNA_LISTA = []
 
 # --- Setup ---
 DB_PATH = "estitor.db"
@@ -85,11 +67,11 @@ conn.commit()
 def make_id(url):
     return hashlib.sha1(url.encode("utf-8")).hexdigest()
 
-# 🆕 Novi precizniji filter za agencije
+# --- Prepoznavanje agencija ---
 def is_agency(seller):
     name = (seller or "").strip().lower()
     if not name:
-        return True  # prazno ime = sigurno agencija
+        return True  # prazno ime = vjerovatno agencija
 
     bad_words = [
         "nekretnine", "real estate", "properties", "consulting",
@@ -97,13 +79,7 @@ def is_agency(seller):
     ]
     return any(word in name for word in bad_words)
 
-def is_private_seller(seller):
-    if not seller:
-        return True
-    blocked_words = ["nekretnine", "real estate", "agency", "agencija"]
-    return not any(bad in seller.lower() for bad in blocked_words)
-
-# --- Čuvanje i slanje ---
+# --- Čuvanje i slanje oglasa ---
 def store_and_notify(item):
     import requests
 
@@ -128,8 +104,10 @@ def store_and_notify(item):
                datetime.now().astimezone().isoformat()))
     conn.commit()
 
-    # --- slanje direktno putem Telegram API-ja ---
     try:
+        api_url = ""
+        payload = {}
+
         if item["img_url"]:
             api_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
             payload = {
@@ -150,7 +128,7 @@ def store_and_notify(item):
         if response.status_code == 200:
             print(f"📤 Poslato: {item['title']}")
         else:
-            print(f"⚠️ Telegram error: {response.text}")
+            print(f"⚠️ Telegram greška: {response.text}")
         
         time.sleep(1)
     except Exception as e:
@@ -202,12 +180,9 @@ def scrape_with_playwright():
         total_new = 0
 
         for pg in range(1, MAX_PAGES + 1):
-            if pg == 1:
-                url = TARGET_URL
-            else:
-                url = TARGET_URL.replace("/grad-podgorica", f"/grad-podgorica/strana-{pg}")
-
+            url = TARGET_URL if pg == 1 else TARGET_URL.replace("/grad-podgorica", f"/grad-podgorica/strana-{pg}")
             print(f"📄 Stranica {pg}: {url}")
+
             try:
                 page.goto(url, timeout=90000)
                 page.wait_for_load_state("networkidle")
@@ -219,40 +194,37 @@ def scrape_with_playwright():
 
                 html = page.content()
                 offers = parse_offers(html)
-
                 print(f"🔎 Pronađeno blokova: {len(offers)}")
-                
-                
 
-                # 🆕 Dodato brojanje preskočenih agencija
                 skipped_agencies = 0
                 sent_this_page = 0
+
                 for o in offers:
                     seller_name = (o.get("seller") or "").strip().lower()
-                    # Normalizacija slova
+
+                    # Normalizacija karaktera
                     for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
                         seller_name = seller_name.replace(src, dst)
-                
-                    # Normalizuj crnu listu
+
                     crna_lista_normalized = []
                     for bad in CRNA_LISTA:
                         bad_norm = bad.strip().lower()
                         for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
                             bad_norm = bad_norm.replace(src, dst)
                         crna_lista_normalized.append(bad_norm)
-                
-                    # 🔒 Provjera da li je prodavac na crnoj listi
+
+                    # Provjera crne liste
                     if any(bad in seller_name for bad in crna_lista_normalized):
                         print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
                         skipped_agencies += 1
                         continue
-                
-                    # 🏢 Preskoči ako je agencija
+
+                    # Preskoči ako je agencija
                     if is_agency(o["seller"]):
                         print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
                         skipped_agencies += 1
                         continue
-                
+
                     # Ako je sve OK — pošalji oglas
                     item = {
                         "title": o["title"],
@@ -262,13 +234,12 @@ def scrape_with_playwright():
                         "img_url": o["img_url"],
                         "seller": o["seller"]
                     }
+
                     if store_and_notify(item):
                         total_new += 1
                         sent_this_page += 1
 
-
-                # 🆕 Novi sažetak po stranici
-                print(f"✅ Stranica {pg}: {len(offers)} pronađeno, {sent_this_page} poslato, {skipped_agencies} preskočeno (agencije ili bez imena).")
+                print(f"✅ Stranica {pg}: {len(offers)} pronađeno, {sent_this_page} poslato, {skipped_agencies} preskočeno.")
 
             except Exception as e:
                 print(f"⚠️ Greška na strani {pg}: {e}")
@@ -276,20 +247,10 @@ def scrape_with_playwright():
         browser.close()
         print(f"📊 Ukupno novih oglasa: {total_new}")
 
-
+# --- Glavna petlja ---
 if __name__ == "__main__":
     while True:
         print("🔎 Pokrećem provjeru Estitor oglasa...")
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
-
-
-
-
-
-
-
-
-
-
