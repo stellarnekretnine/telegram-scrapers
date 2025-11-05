@@ -62,16 +62,6 @@ try:
         print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
         CRNA_LISTA = []
 
-except Exception as e:
-    print(f"⚠️ Greška prilikom učitavanja crne liste: {e}")
-    CRNA_LISTA = []
-
-    
-        print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
-    except FileNotFoundError:
-        CRNA_LISTA = []
-    print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
-
 
 # --- Setup ---
 DB_PATH = "estitor.db"
@@ -293,6 +283,7 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
 
