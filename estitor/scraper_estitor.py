@@ -204,24 +204,26 @@ def scrape_with_playwright():
                 skipped_agencies = 0
                 sent_this_page = 0
 
-                for o in offers:
-                    seller_name = (o.get("seller") or "").strip().lower()
-
-                    # Normalizacija č/ć -> c
+                # --- Crna lista: preskoči zabranjene oglašivače ---
+                seller_name = (o.get("seller") or "").strip().lower()
+                for repl_from, repl_to in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
+                    seller_name = seller_name.replace(repl_from, repl_to)
+                
+                for bad in CRNA_LISTA:
+                    normalized_bad = bad.strip().lower()
                     for repl_from, repl_to in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
-                        seller_name = seller_name.replace(repl_from, repl_to)
-                    
-                    if any(bad.replace("č", "c").replace("ć", "c") in seller_name for bad in CRNA_LISTA):
+                        normalized_bad = normalized_bad.replace(repl_from, repl_to)
+                    if normalized_bad and normalized_bad in seller_name:
                         print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
                         skipped_agencies += 1
-                        continue
-
-                    # 🆕 Nova provjera – preskoči agencije i oglase bez imena
+                        break
+                else:
+                    # ako nije break -> nije na crnoj listi
                     if is_agency(o["seller"]):
                         print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
                         skipped_agencies += 1
                         continue
-
+        
                     item = {
                         "title": o["title"],
                         "price": o["price"],
@@ -250,6 +252,7 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
 
