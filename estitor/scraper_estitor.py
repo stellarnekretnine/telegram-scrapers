@@ -205,7 +205,17 @@ def scrape_with_playwright():
                 sent_this_page = 0
 
                 for o in offers:
-                    if any(bad in o["seller"].lower() for bad in CRNA_LISTA):
+                    seller_name = (o.get("seller") or "").strip().lower()
+
+                    # Normalizacija č/ć -> c
+                    for repl_from, repl_to in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
+                        seller_name = seller_name.replace(repl_from, repl_to)
+                    
+                    if any(bad.replace("č", "c").replace("ć", "c") in seller_name for bad in CRNA_LISTA):
+                        print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
+                        skipped_agencies += 1
+                        continue
+
                         skipped_agencies += 1
                         continue
 
@@ -243,4 +253,5 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
