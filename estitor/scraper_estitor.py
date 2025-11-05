@@ -22,28 +22,62 @@ TARGET_URL = os.getenv("TARGET_URL")
 CRAWL_INTERVAL_MINUTES = int(os.getenv("CRAWL_INTERVAL_MINUTES", 45))
 MAX_PAGES = int(os.getenv("MAX_PAGES", 5))
 
-# --- Block lista ---
-try:
-    crna_lista_path = os.getenv("CRNA_LISTA_FILE", "/etc/secrets/crna_lista.txt")
+# --- Crna lista direktno u kodu ---
+CRNA_LISTA = [
+    "nova lux invest realestate",
+    "damir jukovic",
+    "nemanja krstović",
+    "nemanja bulajić",
+    "dandelion agencija",
+    "milica mitrović",
+    "dream homes montenegro",
+    "luxury property",
+    "marija panoska",
+    "roma nekretnine",
+    "kvadrat nekretnine",
+    "valentina stanišić",
+    "sara panoska",
+    "menalex real state",
+    "violet investment",
+    "master realestate",
+    "puerta real estate",
+    "mat nekretnine nekretnine",
+    "lumaro properties",
+    "forum nekretnine",
+    "diem nekretnine",
+    "dm real estate",
+    "living real estate",
+    "in nekretnine",
+    "mne real estate",
+    "blok nekretnine podgorica",
+    "centar nekretnine",
+    "jutro nekretnine",
+    "multitask nekretnine",
+    "remontenegro - real estate montenegro",
+    "kvart real estate",
+    "domus nekretnine",
+    "nekretnine menadžer",
+    "milena tajić",
+    "alda realty group",
+    "dragana z",
+    "focus nekretnine",
+    "city_properties_nekretnine",
+    "taluma montenegro",
+    "prego nekretnine",
+    "pg nekretnine",
+    "agencija manzil home",
+    "ismail dacic",
+    "nikola lekić",
+    "jelena marković",
+    "vedad kurpejović",
+    "jb global asset",
+    "nikola ivanovic",
+    "marija ivanovic",
+    "dimitrije bozovic",
+    "sladja lazarević",
+]
+print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste (direktno iz koda).")
 
-    # Sačekaj da Render mountuje fajl (nekad kasni sekund-dva)
-    for _ in range(5):
-        if os.path.exists(crna_lista_path):
-            break
-        print("⌛ Čekam da Render učita crna_lista.txt...")
-        time.sleep(2)
-
-    if os.path.exists(crna_lista_path):
-        with open(crna_lista_path, "r", encoding="utf-8") as f:
-            CRNA_LISTA = [line.strip().lower() for line in f if line.strip()]
-        print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
-    else:
-        print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
-        CRNA_LISTA = []
-
-except Exception as e:
-    print(f"⚠️ Greška prilikom učitavanja crne liste: {e}")
-    CRNA_LISTA = []
 
 # --- Setup ---
 DB_PATH = "estitor.db"
@@ -254,3 +288,4 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
