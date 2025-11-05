@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from telegram import Bot
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
+import subprocess
+subprocess.run(["python", "-m", "playwright", "install", "chromium"], check=False)
 import html as html_lib
 
 load_dotenv()
@@ -241,3 +243,4 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
