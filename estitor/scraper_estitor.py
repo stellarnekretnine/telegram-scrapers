@@ -32,7 +32,7 @@ CRNA_LISTA = [
     "milica mitrović",
     "dream homes montenegro",
     "luxury property",
-    "marija panoska",
+    "marija  panoska",
     "roma nekretnine",
     "kvadrat nekretnine",
     "valentina stanišić",
@@ -288,4 +288,5 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
