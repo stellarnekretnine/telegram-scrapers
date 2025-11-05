@@ -39,7 +39,15 @@ CRAWL_INTERVAL_MINUTES = int(os.getenv("CRAWL_INTERVAL_MINUTES", 45))
 MAX_PAGES = int(os.getenv("MAX_PAGES", 5))
 
 # --- Block lista ---
-CRNA_LISTA = [x.strip().lower() for x in os.getenv("CRNA_LISTA", "").split(",") if x.strip()]
+# --- Block lista ---
+try:
+    with open("/etc/secrets/crna_lista.txt", "r", encoding="utf-8") as f:
+        CRNA_LISTA = [line.strip().lower() for line in f if line.strip()]
+    print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
+except FileNotFoundError:
+    CRNA_LISTA = []
+    print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
+
 
 # --- Setup ---
 DB_PATH = "estitor.db"
@@ -261,6 +269,7 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
 
