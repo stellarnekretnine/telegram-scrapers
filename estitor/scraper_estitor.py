@@ -41,11 +41,29 @@ MAX_PAGES = int(os.getenv("MAX_PAGES", 5))
 # --- Block lista ---
 # --- Block lista ---
 try:
-    with open("/etc/secrets/crna_lista.txt", "r", encoding="utf-8") as f:
-        CRNA_LISTA = [line.strip().lower() for line in f if line.strip()]
-    print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
-except FileNotFoundError:
-    CRNA_LISTA = []
+    import os
+    import time
+    
+    # Sačekaj da Render mountuje fajl (nekad kasni sekund-dva)
+    crna_lista_path = os.getenv("CRNA_LISTA_FILE", "/etc/secrets/crna_lista.txt")
+    
+    for _ in range(5):  # pokušaj do 5 puta
+        if os.path.exists(crna_lista_path):
+            break
+        print("⌛ Čekam da Render učita crna_lista.txt...")
+        time.sleep(2)
+    
+    if os.path.exists(crna_lista_path):
+        with open(crna_lista_path, "r", encoding="utf-8") as f:
+            CRNA_LISTA = [line.strip().lower() for line in f if line.strip()]
+        print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
+    else:
+        print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
+        CRNA_LISTA = []
+    
+        print(f"✅ Učitano {len(CRNA_LISTA)} imena iz crne liste.")
+    except FileNotFoundError:
+        CRNA_LISTA = []
     print("⚠️ Nije pronađen fajl crna_lista.txt — crna lista prazna.")
 
 
@@ -269,6 +287,7 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
 
