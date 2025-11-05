@@ -206,26 +206,32 @@ def scrape_with_playwright():
                 skipped_agencies = 0
                 sent_this_page = 0
                 for o in offers:
-                    # --- Crna lista: preskoči zabranjene oglašivače ---
                     seller_name = (o.get("seller") or "").strip().lower()
-                    for repl_from, repl_to in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
-                        seller_name = seller_name.replace(repl_from, repl_to)
-                    
+                    # Normalizacija slova
+                    for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
+                        seller_name = seller_name.replace(src, dst)
+                
+                    # Normalizuj crnu listu
+                    crna_lista_normalized = []
                     for bad in CRNA_LISTA:
-                        normalized_bad = bad.strip().lower()
-                        for repl_from, repl_to in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
-                            normalized_bad = normalized_bad.replace(repl_from, repl_to)
-                        if normalized_bad and normalized_bad in seller_name:
-                            print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
-                            skipped_agencies += 1
-                            break
-                    else:
-                        # ako nije break -> nije na crnoj listi
-                        if is_agency(o["seller"]):
-                            print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
-                            skipped_agencies += 1
-                            continue
-        
+                        bad_norm = bad.strip().lower()
+                        for src, dst in [("č", "c"), ("ć", "c"), ("š", "s"), ("ž", "z"), ("đ", "dj")]:
+                            bad_norm = bad_norm.replace(src, dst)
+                        crna_lista_normalized.append(bad_norm)
+                
+                    # 🔒 Provjera da li je prodavac na crnoj listi
+                    if any(bad in seller_name for bad in crna_lista_normalized):
+                        print(f"⛔ Preskačem oglas jer je na crnoj listi: {o['seller']}")
+                        skipped_agencies += 1
+                        continue
+                
+                    # 🏢 Preskoči ako je agencija
+                    if is_agency(o["seller"]):
+                        print(f"🏢 Preskačem jer je agencija ili nema ime: {o['seller']}")
+                        skipped_agencies += 1
+                        continue
+                
+                    # Ako je sve OK — pošalji oglas
                     item = {
                         "title": o["title"],
                         "price": o["price"],
@@ -237,6 +243,7 @@ def scrape_with_playwright():
                     if store_and_notify(item):
                         total_new += 1
                         sent_this_page += 1
+
 
                 # 🆕 Novi sažetak po stranici
                 print(f"✅ Stranica {pg}: {len(offers)} pronađeno, {sent_this_page} poslato, {skipped_agencies} preskočeno (agencije ili bez imena).")
@@ -254,6 +261,7 @@ if __name__ == "__main__":
         scrape_with_playwright()
         print(f"💤 Čekam {CRAWL_INTERVAL_MINUTES} minuta prije sljedeće provjere...\n")
         time.sleep(CRAWL_INTERVAL_MINUTES * 60)
+
 
 
 
