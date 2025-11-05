@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Render build script for Playwright setup
+# ✅ Render build script for Playwright setup
 
-echo "Installing dependencies..."
+echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
 echo "Installing Playwright browsers..."
-npx playwright install chromium --with-deps || python -m playwright install chromium --with-deps
+python -m playwright install chromium
 
-echo "✅ Playwright browser installation complete!"
+echo "✅ Playwright installed successfully!"
